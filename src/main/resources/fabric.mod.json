@@ -3,29 +3,28 @@
   "id": "${id}",
   "version": "${version}",
   "name": "${name}",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "description": "Records sounds on the server and exports them as lagless audio",
   "authors": [
-    "Me!"
+    "RS256"
   ],
   "contact": {
-    "homepage": "https://stonecutter.kikugie.dev/",
-    "sources": "https://codeberg.org/stonecutter/template-fabric"
+    "sources": "https://github.com/RS-256/jukebox"
   },
   "license": "CC0-1.0",
-  "icon": "assets/template/icon.png",
+  "icon": "assets/jukebox/icon.png",
   "environment": "*",
   "entrypoints": {
     "main": [
-      "com.example.TemplateMod"
+      "net.rs256.jukebox.JukeboxMod"
     ],
     "client": [
-      "com.example.client.TemplateModClient"
+      "net.rs256.jukebox.client.JukeboxClient"
     ]
   },
   "mixins": [
-    "template.mixins.json",
+    "jukebox.mixins.json",
     {
-      "config": "templateClient.mixins.json",
+      "config": "jukeboxClient.mixins.json",
       "environment": "client"
     }
   ],

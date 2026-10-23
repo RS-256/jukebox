@@ -1,9 +1,8 @@
 {
   "required": true,
-  "package": "com.example.mixin",
+  "package": "net.rs256.jukebox.mixin",
   "compatibilityLevel": "${java}",
   "mixins": [
-    "ExampleMixin"
   ],
   "injectors": {
     "defaultRequire": 1

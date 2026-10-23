@@ -12,7 +12,7 @@ plugins {
     // id("me.modmuss50.mod-publish-plugin") version "1.1.0" apply false  // uncomment to enable publishing
 }
 
-stonecutter active "26.3"
+stonecutter active "1.21.11"
 
 // ---------------------------------------------------------------
 // Stonecutter parameters - available in every versioned subproject
@@ -52,8 +52,7 @@ tasks.register("runServerCurrentVersion") {
 // Each entry maps to one Modrinth upload (or CurseForge).
 // ---------------------------------------------------------------
 val releaseVersions = listOf(
-    "1.21.11",
-    "26.3"
+    "1.21.11"
 )
 
 extra["publish.changelogReleaseVersion"] = releaseVersions.last()

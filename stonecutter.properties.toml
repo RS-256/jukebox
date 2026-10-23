@@ -1,8 +1,8 @@
 # Mod metadata — shared across all versions
-mod.id      = "template"
-mod.name    = "Template"
+mod.id      = "jukebox"
+mod.name    = "Jukebox"
 mod.version = "0.1.0"
-mod.group   = "com.example"
+mod.group   = "net.rs256.jukebox"
 
 # deps. is used dependency resolving,
 # build. is used build jar resource prosessing
@@ -13,7 +13,7 @@ build.fabric_api    = "*"
 
 publish.modrinth   = "XXXXXXXX"
 publish.curseforge = "XXXXXXXX"
-publish.github     = "RS-256/stonecutter-template-fabric"   #owner/repo
+publish.github     = "RS-256/jukebox"   #owner/repo
 
 # Per-version properties
 ["1.21.11"]
@@ -23,8 +23,8 @@ mod.mc_title    = "1.21.11"
 mod.mc_targets  = "1.21.11"
 # build.fabric_api = "0.141.3+1.21.11"     # additional if needed
 
-["26.3"]
-deps.fabric_api = "0.161.0+26.3"
-mod.mc_dep      = "26.3"
-mod.mc_title    = "26.3"
-mod.mc_targets  = "26.3"
+# ["26.3"]
+# deps.fabric_api = "0.161.0+26.3"
+# mod.mc_dep      = "26.3"
+# mod.mc_title    = "26.3"
+# mod.mc_targets  = "26.3"
