@@ -6,8 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * One event of a {@link TickRecord}. Values are always held resolved; omitting defaults
- * ({@code pos = [0,0,0]}, {@code dimension = previous}, ...) is up to the writer and reader.
+ * One event of a {@link TickRecord}. Non-null values are always written; nullable ones only when set.
  */
 public sealed interface JukeboxEvent {
     String type();
@@ -37,7 +36,6 @@ public sealed interface JukeboxEvent {
             float range
     ) implements JukeboxEvent {
         public static final String TYPE = "sound";
-        public static final String DEFAULT_CATEGORY = "master";
 
         /** {@code net.minecraft.sounds.SoundEvent#getRange(volume)} without a fixed range. */
         public static float derivedRange(float volume) {
