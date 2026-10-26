@@ -28,8 +28,8 @@ public final class DiscWriter implements Closeable {
     public static final String META_FILE = "meta.json";
     public static final String TICKS_FILE = "ticks.json";
 
-    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
-    private static final Gson PRETTY_GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+    static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
+    static final Gson PRETTY_GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
 
     /** What {@code header.json} already knows when the recording starts. */
     public record Meta(
@@ -200,11 +200,59 @@ public final class DiscWriter implements Closeable {
     }
 
     /**
+     * {@code header.json}: {@link #metaToJson} plus {@code durationTicks} and {@code stats}.
+     * <pre>{@code
+     * {
+     *   "schema": 0,
+     *   "source": "server",
+     *   "created": "2026-10-22T12:34:56Z",
+     *   "durationTicks": 2412,
+     *   "mcVersion": "1.21.11",
+     *   "modVersion": "0.1.0",
+     *   "world": "New World",
+     *   "timing": {
+     *     "mode": "ideal",
+     *     "accuracy": "tick",
+     *     "initialNspt": 50000000
+     *   },
+     *   "stats": {
+     *     "ticksRecorded": 1203,
+     *     "sounds": 8213,
+     *     "uniqueSounds": 12
+     *   }
+     * }
+     * }</pre>
+     */
+    static JsonObject headerToJson(Header header) {
+        JsonObject timing = new JsonObject();
+        timing.addProperty("mode", header.timing().mode());
+        timing.addProperty("accuracy", header.timing().accuracy());
+        timing.addProperty("initialNspt", header.timing().initialNspt());
+
+        JsonObject stats = new JsonObject();
+        stats.addProperty("ticksRecorded", header.stats().ticksRecorded());
+        stats.addProperty("sounds", header.stats().sounds());
+        stats.addProperty("uniqueSounds", header.stats().uniqueSounds());
+
+        JsonObject json = new JsonObject();
+        json.addProperty("schema", header.schema());
+        json.addProperty("source", header.source());
+        json.addProperty("created", header.created().toString());
+        json.addProperty("durationTicks", header.durationTicks());
+        json.addProperty("mcVersion", header.mcVersion());
+        json.addProperty("modVersion", header.modVersion());
+        json.addProperty("world", header.world());
+        json.add("timing", timing);
+        json.add("stats", stats);
+        return json;
+    }
+
+    /**
      * <pre>{@code
      * {"tick":7,"events":[<event>, ...]}
      * }</pre>
      */
-    private static JsonObject tickToJson(int tick, List<JukeboxEvent> events) {
+    static JsonObject tickToJson(int tick, List<JukeboxEvent> events) {
         JsonArray array = new JsonArray();
         for (JukeboxEvent event : events) {
             array.add(eventToJson(event));

@@ -90,8 +90,8 @@ public final class DiscReader implements Closeable {
         }
     }
 
-    /** Reads what {@code DiscWriter#metaToJson} writes, plus {@code durationTicks} and {@code stats}. */
-    private static Header headerFromJson(JsonObject json) {
+    /** Reads what {@link DiscWriter#headerToJson} writes. */
+    static Header headerFromJson(JsonObject json) {
         int schema = requireNumber(json, "schema").intValue();
         checkSchema(schema);
 
