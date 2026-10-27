@@ -2,6 +2,7 @@ package net.rs256.jukebox;
 
 import net.fabricmc.api.ModInitializer;
 import net.minecraft.resources.Identifier;
+import net.rs256.jukebox.server.ServerRecorder;
 //? if <=1.18.2 {
 /*import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -28,6 +29,7 @@ public class JukeboxMod implements ModInitializer {
         // Proceed with mild caution.
         LOGGER.info("Jukebox {} for Minecraft {}", VERSION, MINECRAFT);
 
+        ServerRecorder.register();
         //registerCommands();
     }
 
