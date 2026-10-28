@@ -1,6 +1,7 @@
 package net.rs256.jukebox.server;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.storage.LevelResource;
@@ -8,6 +9,7 @@ import net.rs256.jukebox.JukeboxMod;
 import net.rs256.jukebox.disc.DiscContainer;
 import net.rs256.jukebox.disc.DiscWriter;
 import net.rs256.jukebox.disc.Header;
+import net.rs256.jukebox.disc.JukeboxEvent;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -29,10 +31,11 @@ public final class ServerRecorder {
 
     private static @Nullable ServerRecorder instance;
 
-    public record Status(String name, Instant started) {
+    /** @param ticks jukebox ticks recorded so far */
+    public record Status(String name, Instant started, int ticks) {
     }
 
-    private record Recording(String name, Path recordingDir, Path disc, DiscWriter writer, Instant started) {
+    private record Recording(String name, Path recordingDir, Path disc, DiscWriter writer, TickClock clock, Instant started) {
     }
 
     private final MinecraftServer server;
@@ -52,6 +55,11 @@ public final class ServerRecorder {
             }
             instance = null;
         });
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            if (instance != null) {
+                instance.onEndTick();
+            }
+        });
     }
 
     /** The recorder of the running server. */
@@ -70,7 +78,7 @@ public final class ServerRecorder {
         if (this.recording == null) {
             return null;
         } else {
-            return new Status(this.recording.name(), this.recording.started());
+            return new Status(this.recording.name(), this.recording.started(), this.recording.clock().tick());
         }
     }
 
@@ -108,9 +116,12 @@ public final class ServerRecorder {
                 new Header.Timing(Header.Timing.MODE_IDEAL, Header.Timing.ACCURACY_TICK, this.server.tickRateManager().nanosecondsPerTick())
         );
         DiscWriter writer = DiscWriter.open(recordingDir, meta);
-        this.recording = new Recording(name, recordingDir, disc, writer, started);
+        TickClock clock = new TickClock(this.server.tickRateManager());
+        writer.beginTick(clock.tick());
+        writer.add(clock.initialEvent());
+        this.recording = new Recording(name, recordingDir, disc, writer, clock, started);
         JukeboxMod.LOGGER.info("Started recording {}", name);
-        return new Status(name, started);
+        return new Status(name, started, clock.tick());
     }
 
     /**
@@ -120,7 +131,8 @@ public final class ServerRecorder {
      */
     public Path stop() throws IOException {
         Recording recording = this.take();
-        Header header = recording.writer().finish(0);
+        recording.writer().endTick();
+        Header header = recording.writer().finish(recording.clock().tick());
         DiscContainer.pack(recording.recordingDir(), header, recording.disc(), DiscContainer.Codec.DEFLATE);
         DiscContainer.deleteRecording(recording.recordingDir());
         JukeboxMod.LOGGER.info("Saved recording {} to {}", recording.name(), recording.disc());
@@ -138,6 +150,36 @@ public final class ServerRecorder {
         DiscContainer.deleteRecording(recording.recordingDir());
         JukeboxMod.LOGGER.info("Cancelled recording {}", recording.name());
         return recording.name();
+    }
+
+    /**
+     * Records tick rate changes, then closes the jukebox tick if game elements ran. While frozen the
+     * tick stays open, so everything that happens during a freeze lands on the same tick.
+     */
+    private void onEndTick() {
+        if (this.recording == null) {
+            return;
+        }
+        DiscWriter writer = this.recording.writer();
+        TickClock clock = this.recording.clock();
+        try {
+            JukeboxEvent.TimingEvent timing = clock.poll();
+            if (timing != null) {
+                writer.add(timing);
+            }
+            if (clock.advance()) {
+                writer.endTick();
+                writer.beginTick(clock.tick());
+            }
+        } catch (IOException | RuntimeException e) {
+            JukeboxMod.LOGGER.error("Recording {} failed; its .recording/ is left as it is", this.recording.name(), e);
+            this.recording = null;
+            try {
+                writer.close();
+            } catch (IOException closeFailure) {
+                e.addSuppressed(closeFailure);
+            }
+        }
     }
 
     /** Saves a running recording when the server stops; on failure the {@code .recording/} is left as it is. */
