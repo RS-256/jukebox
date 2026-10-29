@@ -3,7 +3,11 @@ package net.rs256.jukebox.server;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.Holder;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.storage.LevelResource;
 import net.rs256.jukebox.JukeboxMod;
 import net.rs256.jukebox.disc.DiscContainer;
@@ -72,6 +76,40 @@ public final class ServerRecorder {
 
     public boolean isRecording() {
         return this.recording != null;
+    }
+
+    /**
+     * Called from {@code ServerLevel#playSeededSound} before anything is sent, so sounds nobody hears
+     * are recorded too. Values are raw: no clamp, no packet quantization. Only the server thread records.
+     *
+     * @param entity id of the entity the sound follows, or null for a positioned sound
+     */
+    public static void recordSound(
+            ServerLevel level,
+            double x, double y, double z,
+            Holder<SoundEvent> sound,
+            SoundSource source,
+            float volume,
+            float pitch,
+            long seed,
+            @Nullable Integer entity
+    ) {
+        if (instance == null || instance.recording == null || !instance.server.isSameThread()) {
+            return;
+        }
+        instance.recording.writer().add(new JukeboxEvent.SoundEvent(
+                sound.value().location().toString(),
+                source.getName(),
+                level.dimension().identifier().toString(),
+                x, y, z,
+                volume,
+                pitch,
+                seed,
+                entity,
+                null,
+                null,
+                sound.value().getRange(volume)
+        ));
     }
 
     public @Nullable Status status() {

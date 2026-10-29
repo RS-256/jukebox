@@ -3,6 +3,7 @@
   "package": "net.rs256.jukebox.mixin",
   "compatibilityLevel": "${java}",
   "mixins": [
+    "ServerLevelMixin"
   ],
   "injectors": {
     "defaultRequire": 1
