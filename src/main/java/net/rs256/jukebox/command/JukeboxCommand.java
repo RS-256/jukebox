@@ -31,6 +31,12 @@ public final class JukeboxCommand {
                                 .then(Commands.literal("stop")
                                         .executes(context -> stop(context.getSource()))
                                 )
+                                .then(Commands.literal("cancel")
+                                        .executes(context -> cancel(context.getSource()))
+                                )
+                                .then(Commands.literal("status")
+                                        .executes(context -> status(context.getSource()))
+                                )
                         )
         );
     }
@@ -81,6 +87,35 @@ public final class JukeboxCommand {
             return 0;
         }
         source.sendSuccess(() -> Messages.translatable("jukebox.command.record.stop", disc.getFileName().toString(), status.ticks()), true);
+        return 1;
+    }
+
+    private static int cancel(CommandSourceStack source) {
+        ServerRecorder recorder = ServerRecorder.get();
+        if (!recorder.isRecording()) {
+            source.sendFailure(Messages.translatable("jukebox.command.record.not_recording"));
+            return 0;
+        }
+
+        String name;
+        try {
+            name = recorder.cancel();
+        } catch (IOException e) {
+            JukeboxMod.LOGGER.error("Could not discard the recording", e);
+            source.sendFailure(Messages.translatable("jukebox.command.record.failed", e.getMessage()));
+            return 0;
+        }
+        source.sendSuccess(() -> Messages.translatable("jukebox.command.record.cancel", name), true);
+        return 1;
+    }
+
+    private static int status(CommandSourceStack source) {
+        ServerRecorder.Status status = ServerRecorder.get().status();
+        if (status == null) {
+            source.sendSuccess(() -> Messages.translatable("jukebox.command.record.status.idle"), false);
+        } else {
+            source.sendSuccess(() -> Messages.translatable("jukebox.command.record.status.recording", status.name(), status.ticks()), false);
+        }
         return 1;
     }
 }

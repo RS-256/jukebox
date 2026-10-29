@@ -1,6 +1,9 @@
 {
   "jukebox.command.record.start": "Started recording %s",
   "jukebox.command.record.stop": "Saved %s (%s ticks)",
+  "jukebox.command.record.cancel": "Discarded recording %s",
+  "jukebox.command.record.status.recording": "Recording %s: %s ticks",
+  "jukebox.command.record.status.idle": "Not recording",
   "jukebox.command.record.already_recording": "Already recording %s",
   "jukebox.command.record.not_recording": "Not recording",
   "jukebox.command.record.invalid_name": "Invalid name: %s",
