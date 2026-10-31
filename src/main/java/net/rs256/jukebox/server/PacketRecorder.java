@@ -18,17 +18,16 @@ import net.rs256.jukebox.disc.JukeboxEvent;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * Records packets sent to players that the world hooks do not see. Packets of one tick with the same
- * content become one event whose {@code targets} are the receivers; they are written when the tick
- * ends. Server thread only.
+ * Records packets sent to players that the world hooks do not see. Consecutive packets with the same
+ * content become one event whose {@code targets} are the receivers, so a command sending to each
+ * player in a loop records once; a different packet in between starts a new event, so the order of
+ * sounds and stops is kept. Events are written when the tick ends. Server thread only.
  * <p>
  * Sound packets: those sent directly, without {@code ServerLevel#playSeededSound} ({@code /playsound},
  * the raid horn, mods). Packets with the same sound, seed and position become one {@code sound} event.
@@ -40,8 +39,11 @@ public final class PacketRecorder {
     private final DiscWriter writer;
     private boolean inLevelSound;
     private @Nullable PlaySound playSound;
-    /** Keys are the events without {@code targets}, in the order they were first sent. */
-    private final Map<JukeboxEvent, Set<UUID>> pending = new LinkedHashMap<>();
+    private final List<Pending> pending = new ArrayList<>();
+
+    /** @param key the event without {@code targets} */
+    private record Pending(JukeboxEvent key, Set<UUID> targets) {
+    }
 
     /** The raw arguments of a running {@code /playsound}; its packets carry relocated values. */
     private record PlaySound(String dimension, Vec3 pos, float volume, float minVolume) {
@@ -88,8 +90,8 @@ public final class PacketRecorder {
 
     /** Writes the merged events of this tick into the open tick. */
     void flush() {
-        for (Map.Entry<JukeboxEvent, Set<UUID>> entry : this.pending.entrySet()) {
-            this.writer.add(withTargets(entry.getKey(), new ArrayList<>(entry.getValue())));
+        for (Pending pending : this.pending) {
+            this.writer.add(withTargets(pending.key(), new ArrayList<>(pending.targets())));
         }
         this.pending.clear();
         this.inLevelSound = false;
@@ -110,8 +112,16 @@ public final class PacketRecorder {
         } else {
             return;
         }
-        if (key != null) {
-            this.pending.computeIfAbsent(key, k -> new LinkedHashSet<>()).add(player.getUUID());
+        if (key == null) {
+            return;
+        }
+
+        if (!this.pending.isEmpty() && this.pending.getLast().key().equals(key)) {
+            this.pending.getLast().targets().add(player.getUUID());
+        } else {
+            Set<UUID> targets = new LinkedHashSet<>();
+            targets.add(player.getUUID());
+            this.pending.add(new Pending(key, targets));
         }
     }
 
