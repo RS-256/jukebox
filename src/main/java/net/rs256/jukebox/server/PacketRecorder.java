@@ -4,6 +4,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientboundSoundEntityPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
+import net.minecraft.network.protocol.game.ClientboundStopSoundPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerCommonPacketListenerImpl;
@@ -19,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -30,13 +32,16 @@ import java.util.UUID;
  * <p>
  * Sound packets: those sent directly, without {@code ServerLevel#playSeededSound} ({@code /playsound},
  * the raid horn, mods). Packets with the same sound, seed and position become one {@code sound} event.
+ * <p>
+ * Stop sound packets ({@code /stopsound}): packets with the same sound and category become one
+ * {@code stop} event.
  */
 public final class PacketRecorder {
     private final DiscWriter writer;
     private boolean inLevelSound;
     private @Nullable PlaySound playSound;
-    /** Keys are the events without {@code targets}. */
-    private final Map<JukeboxEvent.SoundEvent, Set<UUID>> pending = new LinkedHashMap<>();
+    /** Keys are the events without {@code targets}, in the order they were first sent. */
+    private final Map<JukeboxEvent, Set<UUID>> pending = new LinkedHashMap<>();
 
     /** The raw arguments of a running {@code /playsound}; its packets carry relocated values. */
     private record PlaySound(String dimension, Vec3 pos, float volume, float minVolume) {
@@ -48,7 +53,9 @@ public final class PacketRecorder {
 
     /** Called for every packet sent to a client, before it is sent. */
     public static void onSend(ServerCommonPacketListenerImpl listener, Packet<?> packet) {
-        if (!(packet instanceof ClientboundSoundPacket) && !(packet instanceof ClientboundSoundEntityPacket)) {
+        if (!(packet instanceof ClientboundSoundPacket)
+                && !(packet instanceof ClientboundSoundEntityPacket)
+                && !(packet instanceof ClientboundStopSoundPacket)) {
             return;
         }
         if (!(listener instanceof ServerGamePacketListenerImpl game)) {
@@ -81,17 +88,8 @@ public final class PacketRecorder {
 
     /** Writes the merged events of this tick into the open tick. */
     void flush() {
-        for (Map.Entry<JukeboxEvent.SoundEvent, Set<UUID>> entry : this.pending.entrySet()) {
-            JukeboxEvent.SoundEvent key = entry.getKey();
-            this.writer.add(new JukeboxEvent.SoundEvent(
-                    key.sound(), key.category(), key.dimension(),
-                    key.x(), key.y(), key.z(),
-                    key.volume(), key.pitch(), key.seed(),
-                    key.entity(),
-                    new ArrayList<>(entry.getValue()),
-                    key.minVolume(),
-                    key.range()
-            ));
+        for (Map.Entry<JukeboxEvent, Set<UUID>> entry : this.pending.entrySet()) {
+            this.writer.add(withTargets(entry.getKey(), new ArrayList<>(entry.getValue())));
         }
         this.pending.clear();
         this.inLevelSound = false;
@@ -102,11 +100,13 @@ public final class PacketRecorder {
         if (this.inLevelSound) {
             return;
         }
-        JukeboxEvent.SoundEvent key;
+        JukeboxEvent key;
         if (packet instanceof ClientboundSoundPacket sound) {
             key = this.positionedKey(player, sound);
         } else if (packet instanceof ClientboundSoundEntityPacket sound) {
             key = this.entityKey(player, sound);
+        } else if (packet instanceof ClientboundStopSoundPacket stop) {
+            key = stopKey(stop);
         } else {
             return;
         }
@@ -162,6 +162,37 @@ public final class PacketRecorder {
                 minVolume,
                 sound.value().getRange(volume)
         );
+    }
+
+    /** Both the sound and the category may be absent = any */
+    private static JukeboxEvent.StopEvent stopKey(ClientboundStopSoundPacket stop) {
+        String sound = null;
+        if (stop.getName() != null) {
+            sound = stop.getName().toString();
+        }
+        String category = null;
+        if (stop.getSource() != null) {
+            category = stop.getSource().getName();
+        }
+        return new JukeboxEvent.StopEvent(sound, category, null);
+    }
+
+    private static JukeboxEvent withTargets(JukeboxEvent key, List<UUID> targets) {
+        if (key instanceof JukeboxEvent.SoundEvent sound) {
+            return new JukeboxEvent.SoundEvent(
+                    sound.sound(), sound.category(), sound.dimension(),
+                    sound.x(), sound.y(), sound.z(),
+                    sound.volume(), sound.pitch(), sound.seed(),
+                    sound.entity(),
+                    targets,
+                    sound.minVolume(),
+                    sound.range()
+            );
+        } else if (key instanceof JukeboxEvent.StopEvent stop) {
+            return new JukeboxEvent.StopEvent(stop.sound(), stop.category(), targets);
+        } else {
+            throw new IllegalArgumentException("not a packet event: " + key.type());
+        }
     }
 
     private static String dimension(ServerPlayer player) {
