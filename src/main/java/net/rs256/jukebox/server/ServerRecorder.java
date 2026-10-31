@@ -39,7 +39,7 @@ public final class ServerRecorder {
     public record Status(String name, Instant started, int ticks) {
     }
 
-    private record Recording(String name, Path recordingDir, Path disc, DiscWriter writer, TickClock clock, Instant started) {
+    private record Recording(String name, Path recordingDir, Path disc, DiscWriter writer, TickClock clock, PacketRecorder packetRecorder, Instant started) {
     }
 
     private final MinecraftServer server;
@@ -78,9 +78,19 @@ public final class ServerRecorder {
         return this.recording != null;
     }
 
+    /** The packet recorder of the running recording, or null when idle or off the server thread. */
+    public static @Nullable PacketRecorder packetRecorder() {
+        if (instance == null || instance.recording == null || !instance.server.isSameThread()) {
+            return null;
+        }
+        return instance.recording.packetRecorder();
+    }
+
     /**
      * Called from {@code ServerLevel#playSeededSound} before anything is sent, so sounds nobody hears
      * are recorded too. Values are raw: no clamp, no packet quantization. Only the server thread records.
+     * The packets it sends are ignored by the {@link PacketRecorder} until
+     * {@link PacketRecorder#exitLevelSound()}.
      *
      * @param entity id of the entity the sound follows, or null for a positioned sound
      */
@@ -110,6 +120,7 @@ public final class ServerRecorder {
                 null,
                 sound.value().getRange(volume)
         ));
+        instance.recording.packetRecorder().enterLevelSound();
     }
 
     public @Nullable Status status() {
@@ -157,7 +168,7 @@ public final class ServerRecorder {
         TickClock clock = new TickClock(this.server.tickRateManager());
         writer.beginTick(clock.tick());
         writer.add(clock.initialEvent());
-        this.recording = new Recording(name, recordingDir, disc, writer, clock, started);
+        this.recording = new Recording(name, recordingDir, disc, writer, clock, new PacketRecorder(writer), started);
         JukeboxMod.LOGGER.info("Started recording {}", name);
         return new Status(name, started, clock.tick());
     }
@@ -169,6 +180,7 @@ public final class ServerRecorder {
      */
     public Path stop() throws IOException {
         Recording recording = this.take();
+        recording.packetRecorder().flush();
         recording.writer().endTick();
         Header header = recording.writer().finish(recording.clock().tick());
         DiscContainer.pack(recording.recordingDir(), header, recording.disc(), DiscContainer.Codec.DEFLATE);
@@ -191,8 +203,8 @@ public final class ServerRecorder {
     }
 
     /**
-     * Records tick rate changes, then closes the jukebox tick if game elements ran. While frozen the
-     * tick stays open, so everything that happens during a freeze lands on the same tick.
+     * Writes the merged packet sounds and tick rate changes, then closes the jukebox tick if game elements
+     * ran. While frozen the tick stays open, so everything that happens during a freeze lands on the same tick.
      */
     private void onEndTick() {
         if (this.recording == null) {
@@ -201,6 +213,7 @@ public final class ServerRecorder {
         DiscWriter writer = this.recording.writer();
         TickClock clock = this.recording.clock();
         try {
+            this.recording.packetRecorder().flush();
             JukeboxEvent.TimingEvent timing = clock.poll();
             if (timing != null) {
                 writer.add(timing);

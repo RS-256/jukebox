@@ -3,6 +3,8 @@
   "package": "net.rs256.jukebox.mixin",
   "compatibilityLevel": "${java}",
   "mixins": [
+    "PlaySoundCommandMixin",
+    "ServerCommonPacketListenerImplMixin",
     "ServerLevelMixin"
   ],
   "injectors": {
